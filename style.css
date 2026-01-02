@@ -46,12 +46,12 @@ body {
 
 .mode-indicator {
   position: fixed;
-  top: 24px;
+  bottom: 30px;
   left: 50%;
-  transform: translateX(-80%);
+  transform: translateX(-50%);
   z-index: 10;
 
-  padding: 6px 14px;
+  padding: 10px 20px;
   border-radius: 16px;
 
   font-size: 18px;
@@ -63,4 +63,30 @@ body {
 
   user-select: none;
   pointer-events: none;
+}
+
+.history-controls {
+  position: fixed;
+  top: 70px;
+  left: 20px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+}
+
+.history-controls button {
+  padding: 6px 10px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.history-controls button:hover {
+  background-color: #e5f5f7;
+  color: #70a6ad;
+}
+
+.history-controls button:active {
+  color: red;
 }

@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GUIController } from './gui.js';
+import { GUIController } from './datgui.js';
 import RubikCube from './objects/RubikCube.js';
 import RotationManager from './core/RotationManager.js';
 import RotateControls from './ui/RotateControls.js';
 import ModeIndicator from './ui/ModeIndicator.js';
+import HistoryManager from './core/history/HistoryManager.js';
+import HistoryControls from './ui/HistoryControls.js';
 import { INTERACT_MODE } from './constants/index.js';
 
 class MainApp {
@@ -94,12 +96,15 @@ class MainApp {
   }
 
   initRotationManager() {
+    this.history = new HistoryManager();
     this.rotationManager = new RotationManager({
       scene: this.scene,
       camera: this.camera,
       domElement: this.renderer.domElement,
       rubik: this.rubik,
+      history: this.history,
     });
+    this.historyControls = new HistoryControls(this);
   }
 
   addEvents() {

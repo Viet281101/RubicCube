@@ -19,6 +19,11 @@ export const AXES = Object.freeze({
   Z: 'z',
 });
 
+export const DRAG_AXIS = Object.freeze({
+  HORIZONTAL: 'HORIZONTAL',
+  VERTICAL: 'VERTICAL',
+});
+
 export const FACE_TO_AXIS = {
   [FACES.RIGHT]: AXES.X,
   [FACES.LEFT]: AXES.X,

@@ -6,12 +6,12 @@ Make a 3D Rubik cube with pure JS.
 
 Run this command inside the root folder of project:
 
-```
+```bash
 chmod +x ./debug.sh
 ```
 
 then
 
-```
+```bash
 ./debug.sh
 ```
