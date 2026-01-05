@@ -31,5 +31,13 @@ export default class HistoryControls {
     this.redoBtn.addEventListener('click', () => {
       this.app.rotationManager.redo();
     });
+
+    window.addEventListener('keydown', (event) => {
+      if (event.ctrlKey && event.key === 'z') {
+        this.app.rotationManager.undo();
+      } else if (event.ctrlKey && event.key === 'y') {
+        this.app.rotationManager.redo();
+      }
+    });
   }
 }

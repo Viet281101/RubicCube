@@ -1,5 +1,7 @@
+import * as THREE from 'three';
+import FaceHighlightHelper from './rotation/FaceHighlightHelper.js';
+import CameraDragResolver from './rotation/CameraDragResolver.js';
 import RaycastHelper from './rotation/RaycastHelper.js';
-import DragResolver from './rotation/DragResolver.js';
 import LayerManager from './rotation/LayerManager.js';
 import { DRAG_AXIS } from '../constants/index.js';
 
@@ -49,6 +51,9 @@ export default class RotationManager {
     this._onPointerDown = this._onPointerDown.bind(this);
     this._onPointerMove = this._onPointerMove.bind(this);
     this._onPointerUp = this._onPointerUp.bind(this);
+
+    // Face highlighter
+    this.faceHighlighter = new FaceHighlightHelper(scene);
   }
 
   /* =======================
@@ -123,25 +128,48 @@ export default class RotationManager {
     const { cubie, face, axis, layer } =
       this.raycastHelper.extractRotationInfo(intersect);
 
+    const normal = intersect.face.normal.clone();
+    normal.transformDirection(intersect.object.matrixWorld);
+
     this.active.cubie = cubie;
     this.active.face = face;
     this.active.axis = axis;
     this.active.layer = layer;
 
+    this.active.faceNormal = normal;
+    this.active.cameraRight = new THREE.Vector3();
+    this.active.cameraUp = new THREE.Vector3();
+    this.camera.getWorldDirection(
+      (this.active.cameraForward ??= new THREE.Vector3())
+    );
+    this.active.cameraRight.setFromMatrixColumn(this.camera.matrixWorld, 0);
+    this.active.cameraUp.setFromMatrixColumn(this.camera.matrixWorld, 1);
+
     this.drag.startX = event.clientX;
     this.drag.startY = event.clientY;
     this.drag.dragging = true;
 
-    // console.log('[RotationManager]', {
-    //   face,
-    //   axis,
-    //   layer,
-    //   cubieIndex: cubie.index,
-    // });
+    this.faceHighlighter.hide();
+
+    console.log('[RotationManager]', {
+      face,
+      axis,
+      layer,
+      cubieIndex: cubie.index,
+    });
   }
 
   _onPointerMove(event) {
     if (!this.enabled || this.isRotating) return;
+
+    const intersect = this.raycastHelper.raycast(event, this.domElement);
+
+    if (intersect && !this.drag.dragging) {
+      this.faceHighlighter.show(intersect);
+    } else {
+      this.faceHighlighter.hide();
+    }
+
     if (!this.drag.dragging || !this.active.face) return;
 
     this.drag.dx = event.clientX - this.drag.startX;
@@ -162,7 +190,7 @@ export default class RotationManager {
           ? DRAG_AXIS.HORIZONTAL
           : DRAG_AXIS.VERTICAL;
 
-      // console.log('[Drag locked]', this.drag.axis);
+      console.log('[Drag locked]', this.drag.axis);
     }
   }
 
@@ -173,10 +201,12 @@ export default class RotationManager {
       return;
     }
 
-    const { rotateAxis, direction } = DragResolver.resolveRotationFromDrag({
-      face: this.active.face,
+    const { rotateAxis, direction } = CameraDragResolver.resolve({
       dx: this.drag.dx,
       dy: this.drag.dy,
+      faceNormal: this.active.faceNormal,
+      cameraRight: this.active.cameraRight,
+      cameraUp: this.active.cameraUp,
     });
 
     const layer = this.raycastHelper.getLayerFromCubie(
@@ -248,13 +278,10 @@ export default class RotationManager {
 
   _applyInstantRotation({ axis, layer, direction }) {
     const group = this.layerManager.createRotationGroup(axis, layer);
-
     group.rotation[axis] = (direction * Math.PI) / 2;
-
     group.updateMatrixWorld(true);
 
     const rotatedCubies = this.layerManager.finishRotationGroup(group);
-
     this.layerManager.commitCubieIndex(rotatedCubies, axis, direction);
   }
 }
