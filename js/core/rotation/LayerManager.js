@@ -84,8 +84,8 @@ export default class LayerManager {
       cubie.object3D.rotation.z =
         Math.round(cubie.object3D.rotation.z / step) * step;
       cubie.object3D.updateMatrix();
-      cubie.object3D.updateMatrixWorld(true);
     });
+    this.scene.updateMatrixWorld(true);
   }
 
   /**

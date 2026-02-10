@@ -4,18 +4,20 @@ import CameraDragResolver from './rotation/CameraDragResolver.js';
 import RaycastHelper from './rotation/RaycastHelper.js';
 import LayerManager from './rotation/LayerManager.js';
 import { DRAG_AXIS } from '../constants/index.js';
+import { HOOKS } from '../constants/hooks.js';
 
 /**
  * Main controller for handling cube rotations via user interaction
  */
 export default class RotationManager {
-  constructor({ scene, camera, domElement, rubik, history }) {
+  constructor({ scene, camera, domElement, rubik, history, hooks } = {}) {
     this.scene = scene;
     this.camera = camera;
     this.domElement = domElement;
     this.rubik = rubik;
     this.history = history;
     this.locked = false;
+    this.hooks = hooks || null;
 
     // Helper classes
     this.raycastHelper = new RaycastHelper(camera, rubik);
@@ -24,6 +26,7 @@ export default class RotationManager {
     // State
     this.enabled = false;
     this.isRotating = false;
+    this._hasEmittedFirstMove = false;
 
     // Active rotation info
     this.active = {
@@ -55,6 +58,19 @@ export default class RotationManager {
 
     // Face highlighter
     this.faceHighlighter = new FaceHighlightHelper(scene);
+
+    // Listen to history changes to emit first move
+    if (this.history && typeof this.history.onChange === 'function') {
+      this._unsubscribeHistory = this.history.onChange((event) => {
+        if (event.type !== 'push') return;
+        if (this._hasEmittedFirstMove) return;
+        this._hasEmittedFirstMove = true;
+        if (this.hooks && typeof this.hooks.emit === 'function') {
+          this.hooks.emit(HOOKS.FIRST_MOVE, event);
+        }
+      });
+    }
+
   }
 
   /* =======================
@@ -75,11 +91,22 @@ export default class RotationManager {
   }
 
   /**
+   * Clean up listeners when the manager is permanently disposed
+   */
+  destroy() {
+    if (this._unsubscribeHistory) {
+      this._unsubscribeHistory();
+      this._unsubscribeHistory = null;
+    }
+  }
+
+  /**
    * Reset manager when cube is rebuilt
    */
   reset() {
     this.disable();
     this.history.clear();
+    this._hasEmittedFirstMove = false;
   }
 
   update(delta = 1 / 60) {

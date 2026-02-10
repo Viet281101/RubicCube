@@ -18,6 +18,8 @@ export class GUIController {
 
     this.init();
     this.checkWindowSize();
+    this._onResize = () => this.checkWindowSize();
+    window.addEventListener('resize', this._onResize);
   }
 
   init() {
@@ -48,7 +50,6 @@ export class GUIController {
           cubieSize: 1,
           gap: this.settings.gap,
         });
-        this.mainApp.requestRender();
       });
 
     this.controllers.gap = this.gui
@@ -60,7 +61,6 @@ export class GUIController {
           cubieSize: 1,
           gap: value,
         });
-        this.mainApp.requestRender();
       });
 
     this.gui

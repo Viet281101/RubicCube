@@ -3,11 +3,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GUIController } from './datgui.js';
 import RubikCube from './objects/RubikCube.js';
 import RotationManager from './core/RotationManager.js';
+import AppHooks from './core/AppHooks.js';
 import RotateControls from './ui/RotateControls.js';
 import ModeIndicator from './ui/ModeIndicator.js';
 import HistoryManager from './core/history/HistoryManager.js';
 import HistoryControls from './ui/HistoryControls.js';
 import { INTERACT_MODE } from './constants/index.js';
+import { HOOKS } from './constants/hooks.js';
 
 class MainApp {
   constructor() {
@@ -27,6 +29,8 @@ class MainApp {
     this._pixelRatioCurrent = 1;
     this._fpsLowStart = 0;
     this._fpsHighStart = 0;
+    this._pointerMoveScheduled = false;
+    this._pendingRender = false;
     this.fpsLabel = null;
     this._fpsLastTime = this._lastTime;
     this._fpsFrameCount = 0;
@@ -146,46 +150,42 @@ class MainApp {
 
   initRotationManager() {
     this.history = new HistoryManager();
+    this.hooks = new AppHooks();
     this.rotationManager = new RotationManager({
       scene: this.scene,
       camera: this.camera,
       domElement: this.renderer.domElement,
       rubik: this.rubik,
       history: this.history,
+      hooks: this.hooks,
     });
     this.historyControls = new HistoryControls(this);
 
-    // Listen to history changes to lock/unlock cube size
-    this._setupHistoryWatcher();
-  }
-
-  _setupHistoryWatcher() {
-    // Store original push method
-    const originalPush = this.history.push.bind(this.history);
-
-    // Override push to detect first rotation
-    this.history.push = (move) => {
-      originalPush(move);
-
-      // Lock cube size after first rotation
+    this.hooks.once(HOOKS.FIRST_MOVE, () => {
       if (this.guiController) {
         this.guiController.lockCubeEdit();
       }
-    };
+    });
   }
 
   addEvents() {
     window.addEventListener('resize', () => this.resize());
-    this.renderer.domElement.addEventListener('pointerdown', () =>
-      this.requestRender(),
-    );
-    this.renderer.domElement.addEventListener('wheel', () =>
-      this.requestRender(),
-    );
-    this.renderer.domElement.addEventListener('pointermove', () => {
-      if (this.mode === INTERACT_MODE.ROTATE) {
-        this.requestRender();
+    window.addEventListener('beforeunload', () => {
+      if (this.rotationManager) {
+        this.rotationManager.destroy();
       }
+    });
+    const scheduleRender = () => this.requestRender();
+    this.renderer.domElement.addEventListener('pointerdown', scheduleRender);
+    this.renderer.domElement.addEventListener('wheel', scheduleRender);
+    this.renderer.domElement.addEventListener('pointermove', () => {
+      if (this.mode !== INTERACT_MODE.ROTATE) return;
+      if (this._pointerMoveScheduled) return;
+      this._pointerMoveScheduled = true;
+      requestAnimationFrame(() => {
+        this._pointerMoveScheduled = false;
+        this.requestRender();
+      });
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
@@ -216,7 +216,11 @@ class MainApp {
   }
 
   requestRender() {
-    if (this._loopActive) return;
+    if (this._loopActive) {
+      this._pendingRender = true;
+      return;
+    }
+    this._pendingRender = false;
     this._loopActive = true;
     this._lastTime = performance.now();
     this._rafId = requestAnimationFrame((time) => this._renderLoop(time));
@@ -245,6 +249,13 @@ class MainApp {
     }
 
     if (!controlsChanged && !this.rotationManager.isRotating) {
+      if (this._pendingRender) {
+        this._pendingRender = false;
+        this._rafId = requestAnimationFrame((nextTime) =>
+          this._renderLoop(nextTime)
+        );
+        return;
+      }
       this._loopActive = false;
       if (this._rafId) {
         cancelAnimationFrame(this._rafId);
