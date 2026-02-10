@@ -7,6 +7,7 @@ export class GUIController {
       backgroundColor: '#30415c',
       size: 3,
       gap: 0.06,
+      showFps: false,
     };
 
     // Controllers reference
@@ -35,6 +36,7 @@ export class GUIController {
       .name('Background Color')
       .onChange((value) => {
         this.mainApp.renderer.setClearColor(value);
+        this.mainApp.requestRender();
       });
 
     this.controllers.size = this.gui
@@ -46,6 +48,7 @@ export class GUIController {
           cubieSize: 1,
           gap: this.settings.gap,
         });
+        this.mainApp.requestRender();
       });
 
     this.controllers.gap = this.gui
@@ -57,6 +60,15 @@ export class GUIController {
           cubieSize: 1,
           gap: value,
         });
+        this.mainApp.requestRender();
+      });
+
+    this.gui
+      .add(this.settings, 'showFps')
+      .name('Show FPS')
+      .onChange((value) => {
+        this.mainApp.setFpsLabelVisible(value);
+        this.mainApp.requestRender();
       });
   }
 

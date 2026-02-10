@@ -10,13 +10,33 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
 }
 
 #scene {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+.fps-label {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 20;
+  padding: 4px 8px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #e9f2f5;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 6px;
+  user-select: none;
+  pointer-events: none;
 }
 
 .rotate-controls {

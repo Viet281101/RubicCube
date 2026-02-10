@@ -46,6 +46,7 @@ export default class LayerManager {
    */
   finishRotationGroup(group) {
     const rotatedCubies = [];
+    group.updateMatrixWorld(true);
 
     while (group.children.length) {
       const child = group.children[0];
@@ -53,12 +54,38 @@ export default class LayerManager {
       const cubie = this.rubik.cubies.find((c) => c.object3D === child);
       if (cubie) rotatedCubies.push(cubie);
 
-      child.applyMatrix4(group.matrix);
+      child.applyMatrix4(group.matrixWorld);
       this.scene.add(child);
     }
 
     this.scene.remove(group);
     return rotatedCubies;
+  }
+
+  _indexToPosition(index) {
+    const offset = (this.rubik.size - 1) / 2;
+    const spacing = this.rubik.cubieSize + this.rubik.gap;
+    return {
+      x: (index.leftRight - offset) * spacing,
+      y: (index.downUp - offset) * spacing,
+      z: (index.backFront - offset) * spacing,
+    };
+  }
+
+  snapCubieTransforms(cubies) {
+    const step = Math.PI / 2;
+    cubies.forEach((cubie) => {
+      const pos = this._indexToPosition(cubie.index);
+      cubie.object3D.position.set(pos.x, pos.y, pos.z);
+      cubie.object3D.rotation.x =
+        Math.round(cubie.object3D.rotation.x / step) * step;
+      cubie.object3D.rotation.y =
+        Math.round(cubie.object3D.rotation.y / step) * step;
+      cubie.object3D.rotation.z =
+        Math.round(cubie.object3D.rotation.z / step) * step;
+      cubie.object3D.updateMatrix();
+      cubie.object3D.updateMatrixWorld(true);
+    });
   }
 
   /**

@@ -26,31 +26,35 @@ export default class HistoryControls {
   _bindEvents() {
     this.undoBtn.addEventListener('click', () => {
       this.app.rotationManager.undo();
+      this.app.requestRender();
     });
     this.undoBtn.addEventListener(
       'dblclick',
       (e) => {
         e.preventDefault();
       },
-      { passive: false }
+      { passive: false },
     );
 
     this.redoBtn.addEventListener('click', () => {
       this.app.rotationManager.redo();
+      this.app.requestRender();
     });
     this.redoBtn.addEventListener(
       'dblclick',
       (e) => {
         e.preventDefault();
       },
-      { passive: false }
+      { passive: false },
     );
 
     window.addEventListener('keydown', (event) => {
       if (event.ctrlKey && event.key === 'z') {
         this.app.rotationManager.undo();
+        this.app.requestRender();
       } else if (event.ctrlKey && event.key === 'y') {
         this.app.rotationManager.redo();
+        this.app.requestRender();
       }
     });
   }

@@ -19,10 +19,21 @@ class MainApp {
     this.rubik = null;
     this.rotationManager = null;
     this.mode = INTERACT_MODE.VIEW;
+    this._loopActive = false;
+    this._rafId = 0;
+    this._lastTime = performance.now();
+    this._pixelRatioMax = 2;
+    this._pixelRatioMin = 1;
+    this._pixelRatioCurrent = 1;
+    this._fpsLowStart = 0;
+    this._fpsHighStart = 0;
+    this.fpsLabel = null;
+    this._fpsLastTime = this._lastTime;
+    this._fpsFrameCount = 0;
 
     this.init();
     this.addEvents();
-    this.animate();
+    this.requestRender();
 
     this.guiController = new GUIController(this);
     this.rotateControls = new RotateControls(this);
@@ -37,6 +48,7 @@ class MainApp {
     this.initLights();
     this.initRubik();
     this.initRotationManager();
+    this.initFpsLabel();
     this.resize();
   }
 
@@ -52,13 +64,53 @@ class MainApp {
   }
 
   initRenderer() {
+    const isFirefox = /firefox/i.test(navigator.userAgent);
+    const isLinux = /linux/i.test(navigator.userAgent);
+    const maxPixelRatio = isFirefox && isLinux ? 1 : 2;
+
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       antialias: true,
       alpha: false,
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this._pixelRatioMax = Math.min(window.devicePixelRatio || 1, maxPixelRatio);
+    this._pixelRatioCurrent = this._pixelRatioMax;
+    this.renderer.setPixelRatio(this._pixelRatioCurrent);
     this.renderer.setClearColor(0x30415c);
+
+    this.renderer.domElement.addEventListener(
+      'webglcontextlost',
+      (event) => {
+        event.preventDefault();
+        this._loopActive = false;
+        if (this._rafId) {
+          cancelAnimationFrame(this._rafId);
+          this._rafId = 0;
+        }
+        if (this.fpsLabel) {
+          this.fpsLabel.textContent = 'FPS: 0';
+        }
+      },
+      false,
+    );
+
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => {
+      this.requestRender();
+    });
+  }
+
+  initFpsLabel() {
+    this.fpsLabel = document.createElement('div');
+    this.fpsLabel.className = 'fps-label';
+    this.fpsLabel.textContent = 'FPS: --';
+    document.body.appendChild(this.fpsLabel);
+    this.setFpsLabelVisible(false);
+  }
+
+  setFpsLabelVisible(isVisible) {
+    if (!this.fpsLabel) return;
+    this.fpsLabel.style.display = isVisible ? '' : 'none';
+    this.requestRender();
   }
 
   initControls() {
@@ -69,6 +121,9 @@ class MainApp {
     this.controls.minDistance = 4;
     this.controls.maxDistance = 20;
     this.controls.target.set(0, 0, 0);
+
+    this.controls.addEventListener('start', () => this.requestRender());
+    this.controls.addEventListener('change', () => this.requestRender());
   }
 
   initLights() {
@@ -121,6 +176,31 @@ class MainApp {
 
   addEvents() {
     window.addEventListener('resize', () => this.resize());
+    this.renderer.domElement.addEventListener('pointerdown', () =>
+      this.requestRender(),
+    );
+    this.renderer.domElement.addEventListener('wheel', () =>
+      this.requestRender(),
+    );
+    this.renderer.domElement.addEventListener('pointermove', () => {
+      if (this.mode === INTERACT_MODE.ROTATE) {
+        this.requestRender();
+      }
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this._loopActive = false;
+        if (this._rafId) {
+          cancelAnimationFrame(this._rafId);
+          this._rafId = 0;
+        }
+        if (this.fpsLabel) {
+          this.fpsLabel.textContent = 'FPS: 0';
+        }
+      } else {
+        this.requestRender();
+      }
+    });
   }
 
   resize() {
@@ -131,14 +211,94 @@ class MainApp {
       this.renderer.setSize(width, height, false);
       this.camera.aspect = width / height;
       this.camera.updateProjectionMatrix();
+      this.requestRender();
     }
   }
 
-  animate() {
-    requestAnimationFrame(() => this.animate());
-    this.controls.update();
-    this.rotationManager.update();
+  requestRender() {
+    if (this._loopActive) return;
+    this._loopActive = true;
+    this._lastTime = performance.now();
+    this._rafId = requestAnimationFrame((time) => this._renderLoop(time));
+  }
+
+  _renderLoop(time) {
+    if (!this._loopActive) return;
+
+    const delta = Math.min((time - this._lastTime) / 1000, 0.05);
+    this._lastTime = time;
+
+    const controlsChanged = this.controls.update();
+    this.rotationManager.update(delta);
     this.renderer.render(this.scene, this.camera);
+
+    this._fpsFrameCount += 1;
+    const elapsed = time - this._fpsLastTime;
+    if (elapsed >= 500) {
+      const fps = Math.round((this._fpsFrameCount * 1000) / elapsed);
+      if (this.fpsLabel) {
+        this.fpsLabel.textContent = `FPS: ${fps}`;
+      }
+      this._adjustPixelRatio(fps, time);
+      this._fpsFrameCount = 0;
+      this._fpsLastTime = time;
+    }
+
+    if (!controlsChanged && !this.rotationManager.isRotating) {
+      this._loopActive = false;
+      if (this._rafId) {
+        cancelAnimationFrame(this._rafId);
+        this._rafId = 0;
+      }
+      if (this.fpsLabel) {
+        this.fpsLabel.textContent = 'FPS: 0';
+      }
+      this._fpsFrameCount = 0;
+      this._fpsLastTime = time;
+      return;
+    }
+
+    this._rafId = requestAnimationFrame((nextTime) =>
+      this._renderLoop(nextTime),
+    );
+  }
+
+  _adjustPixelRatio(fps, time) {
+    const lowThreshold = 45;
+    const highThreshold = 58;
+
+    if (fps < lowThreshold) {
+      if (!this._fpsLowStart) this._fpsLowStart = time;
+      this._fpsHighStart = 0;
+    } else if (fps > highThreshold) {
+      if (!this._fpsHighStart) this._fpsHighStart = time;
+      this._fpsLowStart = 0;
+    } else {
+      this._fpsLowStart = 0;
+      this._fpsHighStart = 0;
+      return;
+    }
+
+    if (this._fpsLowStart && time - this._fpsLowStart > 1000) {
+      this._setPixelRatio(this._pixelRatioCurrent - 0.25);
+      this._fpsLowStart = 0;
+    }
+
+    if (this._fpsHighStart && time - this._fpsHighStart > 2000) {
+      this._setPixelRatio(this._pixelRatioCurrent + 0.25);
+      this._fpsHighStart = 0;
+    }
+  }
+
+  _setPixelRatio(nextRatio) {
+    const clamped = Math.max(
+      this._pixelRatioMin,
+      Math.min(this._pixelRatioMax, nextRatio),
+    );
+    if (clamped === this._pixelRatioCurrent) return;
+    this._pixelRatioCurrent = clamped;
+    this.renderer.setPixelRatio(this._pixelRatioCurrent);
+    this.requestRender();
   }
 
   rebuildCube(options) {
@@ -161,6 +321,7 @@ class MainApp {
     }
 
     console.log(`[Cube rebuilt] size: ${this.rubik.size}x${this.rubik.size}`);
+    this.requestRender();
   }
 
   enterRotateMode() {
@@ -168,6 +329,10 @@ class MainApp {
     this.mode = INTERACT_MODE.ROTATE;
     this.controls.enabled = false;
     this.rotationManager.enable();
+    if (this.modeIndicator) {
+      this.modeIndicator.update();
+    }
+    this.requestRender();
   }
 
   exitRotateMode() {
@@ -175,6 +340,10 @@ class MainApp {
     this.mode = INTERACT_MODE.VIEW;
     this.controls.enabled = true;
     this.rotationManager.disable();
+    if (this.modeIndicator) {
+      this.modeIndicator.update();
+    }
+    this.requestRender();
   }
 }
 

@@ -4,10 +4,7 @@ export default class ModeIndicator {
     this.element = null;
 
     this._create();
-    this._update();
-
-    this._tick = this._tick.bind(this);
-    requestAnimationFrame(this._tick);
+    this.update();
   }
 
   _create() {
@@ -16,14 +13,8 @@ export default class ModeIndicator {
     document.body.appendChild(this.element);
   }
 
-  _update() {
+  update() {
     this.element.textContent = 'INTERACT MODE : ' + String(this.app.mode);
-
     this.element.dataset.mode = this.app.mode;
-  }
-
-  _tick() {
-    this._update();
-    requestAnimationFrame(this._tick);
   }
 }

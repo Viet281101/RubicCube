@@ -197,7 +197,7 @@ export default class RotationManager {
     this.active.cameraRight = new THREE.Vector3();
     this.active.cameraUp = new THREE.Vector3();
     this.camera.getWorldDirection(
-      (this.active.cameraForward ??= new THREE.Vector3())
+      (this.active.cameraForward ??= new THREE.Vector3()),
     );
     this.active.cameraRight.setFromMatrixColumn(this.camera.matrixWorld, 0);
     this.active.cameraUp.setFromMatrixColumn(this.camera.matrixWorld, 1);
@@ -247,12 +247,12 @@ export default class RotationManager {
 
     const layer = this.raycastHelper.getLayerFromCubie(
       this.active.cubie,
-      rotateAxis
+      rotateAxis,
     );
 
     this.rotationGroup = this.layerManager.createRotationGroup(
       rotateAxis,
-      layer
+      layer,
     );
 
     this.rotation = {
@@ -281,10 +281,11 @@ export default class RotationManager {
       (Math.PI / 2);
 
     const rotatedCubies = this.layerManager.finishRotationGroup(
-      this.rotationGroup
+      this.rotationGroup,
     );
 
     this.layerManager.commitCubieIndex(rotatedCubies, axis, direction);
+    this.layerManager.snapCubieTransforms(rotatedCubies);
 
     this.history.push({
       axis,
